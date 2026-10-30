@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Geomash — Geometry Dash Style Platformer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #06070a; color: #fff;
+    font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    touch-action: none; -webkit-tap-highlight-color: transparent; }
+  #canvas-wrap { position: absolute; inset: 0; background: #040507; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  #ui { position: absolute; inset: 0; pointer-events: none; display: flex;
+    flex-direction: column; justify-content: space-between; padding: 20px; }
+  #hud { pointer-events: auto; display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 16px; }
+  .stat { background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px; padding: 8px 14px; backdrop-filter: blur(6px); }
+  .stat .v { font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+  .stat .l { font-size: 11px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.5px; }
+  #progress { position: absolute; left: 0; top: 0; height: 6px; background: rgba(255,255,255,0.10);
+    width: 100%; border-radius: 0 0 6px 6px; overflow: hidden; pointer-events: none; }
+  #progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg,#00f2ff,#7000ff);
+    border-radius: 0 0 6px 6px; box-shadow: 0 0 18px rgba(0,242,255,0.55); }
+
+  /* Menus */
+  .menu { position: absolute; inset: 0; background: rgba(6,7,10,0.82); backdrop-filter: blur(10px);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 30; }
+  .menu.open { opacity: 1; pointer-events: auto; }
+  .menu h1 { font-size: clamp(34px, 9vw, 72px); font-weight: 900; letter-spacing: 4px;
+    text-transform: uppercase; background: linear-gradient(to bottom,#fff,#7000ff);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5)); }
+  .menu p { font-size: 15px; opacity: 0.85; margin-bottom: 28px; letter-spacing: 1px; }
+
+  button { border: none; outline: none; cursor: pointer; font: inherit; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.2px; border-radius: 10px; padding: 14px 30px;
+    font-size: 16px; color: #fff; background: #00f2ff; box-shadow: 0 0 20px rgba(0,242,255,0.45);
+    transition: transform 0.08s, filter 0.1s; }
+  button:active { transform: scale(0.95); }
+  button.secondary { background: transparent; border: 1.5px solid rgba(255,255,255,0.35);
+    color: #dfe6ee; box-shadow: none; }
+  button.secondary:hover { border-color: #fff; color: #fff; }
+  button.danger { background: #ff3b3b; box-shadow: 0 0 20px rgba(255,59,59,0.55); }
+  .row { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+
+  #touch-hint { position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; opacity: 0.6; letter-spacing: 1px; pointer-events: none; }
+  .mobile #touch-hint { bottom: 110px; }
+
+  #jump-btn { position: absolute; right: 24px; bottom: 24px; width: 86px; height: 86px;
+    border-radius: 50%; background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.35);
+    color: #fff; font-size: 13px; font-weight: 800; display: flex; align-items: center;
+    justify-content: center; pointer-events: auto; box-shadow: 0 6px 0 rgba(0,0,0,0.25);
+    user-select: none; }
+  #jump-btn:active { background: rgba(255,255,255,0.25); transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,0.25); }
+  .desktop #jump-btn { display: none; }
+
+  #msg { position: absolute; top: 40px; left: 50%; transform: translateX(-50%);
+    font-size: 16px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: #00f2ff; text-shadow: 0 0 14px rgba(0,242,255,0.6); opacity: 0; pointer-events: none;
+    transition: opacity 0.15s; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="canvas-wrap"><canvas id="game"></canvas></div>
+
+<div id="progress"><div id="progress-bar"></div></div>
+
+<div id="ui">
+  <div id="hud">
+    <div class="stat"><div class="v" id="percent">0%</div><div class="l">progress</div></div>
+    <div class="stat"><div class="v" id="attempts">1</div><div class="l">attempt</div></div>
+    <div class="stat"><div class="v" id="deaths">0</div><div class="l">deaths</div></div>
+    <div class="stat"><div class="v" id="coins">0</div><div class="l">coins</div></div>
+    <div class="stat" id="mode-chip" style="display:none"><div class="v">PRACTICE</div><div class="l">mode</div></div>
+  </div>
+  <div id="msg"></div>
+</div>
+
+<div class="menu" id="menu-start">
+  <h1>Geomash</h1>
+  <p>Geometry Dash style platformer</p>
+  <div class="row">
+    <button id="btn-normal" onclick="startGame(false)">NORMAL MODE</button>
+    <button id="btn-practice" class="secondary" onclick="startGame(true)">PRACTICE</button>
+  </div>
+  <div class="row" style="margin-top:14px">
+    <button class="secondary" onclick="toggleMute()" id="btn-mute">SOUND: ON</button>
+  </div>
+  <div id="touch-hint">Tap anywhere to jump &nbsp;•&nbsp; Space / Up / Click</div>
+</div>
+
+<div class="menu" id="menu-dead">
+  <h1 style="color:#ff3b3b; background:linear-gradient(to bottom,#ff6b6b,#ff3b3b); -webkit-text-fill-color:transparent;">Crashed</h1>
+  <div id="dead-stat" style="margin:10px 0 22px; font-size:15px; opacity:0.9;">Attempt <span id="dead-attempt">1</span> &bull; <span id="dead-percent">0%</span></div>
+  <div class="row">
+    <button id="btn-retry" onclick="respawn()">RETRY</button>
+    <button class="secondary" onclick="showStart()">MENU</button>
+  </div>
+  <div id="touch-hint" style="opacity:0.85">Tap to retry</div>
+</div>
+
+<div class="menu" id="menu-won">
+  <h1 style="color:#00f2ff; background:linear-gradient(to bottom,#00f2ff,#7000ff); -webkit-text-fill-color:transparent;">Level Complete!</h1>
+  <div id="won-stat" style="margin:10px 0 22px; font-size:15px; opacity:0.9;"></div>
+  <div class="row">
+    <button onclick="startGame(false)">PLAY AGAIN</button>
+    <button class="secondary" onclick="showStart()">MENU</button>
+  </div>
+</div>
+
+<div class="menu" id="menu-pause">
+  <h1>Paused</h1>
+  <div class="row">
+    <button onclick="togglePause()">RESUME</button>
+    <button class="secondary" onclick="showStart()">MENU</button>
+  </div>
+</div>
+
+<div id="jump-btn">JUMP</div>
+
+<script>
+/* ========================= GEOMASH ENGINE ========================= */
+const canvas = document.getElementById('game')
+const ctx = canvas.getContext('2d', { alpha: false })
+
+let W, H
+function resize() {
+  W = canvas.width = window.innerWidth
+  H = canvas.height = window.innerHeight
+  document.body.classList.toggle('mobile', W < 760)
+  camera.x = player ? player.x - W * 0.25 : 0
+}
+window.addEventListener('resize', resize)
+resize()
+
+// ---------- Audio (Web Audio, synthesized, no external files) ----------
+const AudioCtx = window.AudioContext || window.webkitAudioContext
+let audioCtx
+let muted = false
+let musicStarted = false
+
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new AudioCtx()
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume()
+}
+
+function playTone(freq, type, duration, vol = 0.08, startTime = null) {
+  if (muted || !audioCtx) return
+  const t = startTime == null ? audioCtx.currentTime : startTime
+  const osc = audioCtx.createOscillator()
+  const gain = audioCtx.createGain()
+  osc.type = type
+  osc.frequency.setValueAtTime(freq, t)
+  gain.gain.setValueAtTime(vol, t)
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration)
+  osc.connect(gain)
+  gain.connect(audioCtx.destination)
+  osc.start(t)
+  osc.stop(t + duration)
+}
+
+function playNoise(duration, vol = 0.06, startTime = null) {
+  if (muted || !audioCtx) return
+  const t = startTime == null ? audioCtx.currentTime : startTime
+  const bufSize = audioCtx.sampleRate * duration
+  const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate)
+  const data = buf.getChannelData(0)
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1
+  const noise = audioCtx.createBufferSource()
+  noise.buffer = buf
+  const gain = audioCtx.createGain()
+  gain.gain.setValueAtTime(vol, t)
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration)
+  noise.connect(gain)
+  gain.connect(audioCtx.destination)
+  noise.start(t)
+  noise.stop(t + duration)
+}
+
+const SFX = {
+  jump() { playTone(330, 'square', 0.07, 0.1); playTone(440, 'square', 0.06, 0.07, audioCtx.currentTime + 0.03) },
+  orb() { playTone(660, 'square', 0.09, 0.12); playTone(880, 'square', 0.08, 0.09, audioCtx.currentTime + 0.05) },
+  pad() { playTone(220, 'square', 0.12, 0.1); playTone(330, 'square', 0.12, 0.1, audioCtx.currentTime + 0.06) },
+  portal() { playTone(440, 'sine', 0.2, 0.15); playTone(554, 'sine', 0.2, 0.15, audioCtx.currentTime + 0.08) },
+  coin() { playTone(988, 'sine', 0.06, 0.1); playTone(1320, 'sine', 0.06, 0.1, audioCtx.currentTime + 0.04) },
+  die() {
+    playNoise(0.5, 0.12)
+    const t = audioCtx.currentTime
+    for (let i = 0; i < 6; i++) playTone(220 - i * 28, 'square', 0.12, 0.09, t + i * 0.055)
+  },
+  win() {
+    const t = audioCtx.currentTime
+    ;[523, 659, 784, 1047].forEach((f, i) => playTone(f, 'square', 0.18, 0.12, t + i * 0.09))
+  },
+  click() { playTone(800, 'square', 0.04, 0.05) }
+}
+
+let musicInterval
+function startMusic() {
+  if (muted || musicStarted) return
+  musicStarted = true
+  ensureAudio()
+  const base = 220
+  const pattern = [0, 2, 4, 2, 0, -1, 2, 4]
+  let step = 0
+  musicInterval = setInterval(() => {
+    if (muted) return
+    const n = pattern[step % pattern.length]
+    const f = base * Math.pow(2, n / 12)
+    playTone(f, 'square', 0.15, 0.05)
+    step++
+  }, 260)
+}
+function stopMusic() {
+  clearInterval(musicInterval)
+  musicInterval = null
+  musicStarted = false
+}
+function toggleMute() {
+  muted = !muted
+  document.getElementById('btn-mute').textContent = muted ? 'SOUND: OFF' : 'SOUND: ON'
+  if (!muted) { ensureAudio(); startMusic() } else stopMusic()
+}
+
+// ---------- Particles ----------
+const particles = []
+function spawnParticles(x, y, color, count, speed = 3) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * speed * 2,
+      vy: (Math.random() - 0.5) * speed * 2 - 1,
+      life: 1, maxLife: 0.35 + Math.random() * 0.45,
+      size: 2 + Math.random() * 5,
+      color: color || '#00f2ff',
+      rot: Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.4
+    })
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]
+    p.x += p.vx; p.y += p.vy
+    p.vy += 0.6 * dt * 60
+    p.life -= dt / p.maxLife
+    p.rot += p.rotV
+    if (p.life <= 0) particles.splice(i, 1)
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.save()
+    ctx.globalAlpha = p.life
+    ctx.translate(p.x, p.y)
+    ctx.rotate(p.rot)
+    ctx.fillStyle = p.color
+    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size)
+    ctx.restore()
+  }
+}
+
+// ---------- Screen shake ----------
+let shake = 0
+function shakeScreen(amount) { shake = Math.max(shake, amount) }
+function applyShake() {
+  if (shake > 0.02) {
+    ctx.translate((Math.random() - 0.5) * shake * 18, (Math.random() - 0.5) * shake * 18)
+    shake *= 0.88
+  }
+}
+
+// ---------- Input ----------
+const input = { jump: false, pause: false, jumpJust: false, pauseJust: false }
+const prevInput = { jump: false, pause: false }
+const keys = new Set()
+window.addEventListener('keydown', e => {
+  keys.add(e.code)
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowW' || e.code === 'KeyW') input.jump = true
+  if (e.code === 'Escape' || e.code === 'KeyP') input.pause = true
+})
+window.addEventListener('keyup', e => {
+  keys.delete(e.code)
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowW' || e.code === 'KeyW') input.jump = false
+  if (e.code === 'Escape' || e.code === 'KeyP') input.pause = false
+})
+window.addEventListener('mousedown', () => { input.jump = true })
+window.addEventListener('mouseup', () => { input.jump = false })
+window.addEventListener('touchstart', e => { e.preventDefault(); input.jump = true }, { passive: false })
+window.addEventListener('touchend', e => { e.preventDefault(); input.jump = false }, { passive: false })
+document.getElementById('jump-btn').addEventListener('touchstart', e => { e.preventDefault(); input.jump = true }, { passive: false })
+document.getElementById('jump-btn').addEventListener('touchend', e => { e.preventDefault(); input.jump = false }, { passive: false })
+document.getElementById('jump-btn').addEventListener('mousedown', () => { input.jump = true })
+document.getElementById('jump-btn').addEventListener('mouseup', () => { input.jump = false })
+
+function sampleInput() {
+  input.jumpJust = input.jump && !prevInput.jump
+  input.pauseJust = input.pause && !prevInput.pause
+  prevInput.jump = input.jump
+  prevInput.pause = input.pause
+}
+
+// ---------- Camera ----------
+const camera = { x: 0, y: 0, targetX: 0, shakeX: 0, shakeY: 0 }
+
+// ---------- Game state ----------
+const STATE = { MENU: 0, PLAYING: 1, PAUSED: 2, DEAD: 3, WON: 4 }
+let state = STATE.MENU
+let attempt = 1, deaths = 0, coins = 0
+let practice = false
+let checkpoints = []
+
+// ---------- Level ----------
+const GROUND_H = 140
+const CEIL_EDGE = GROUND_H            // bottom edge of the ceiling block
+const BLOCK = 64
+const PLAYER_SIZE = 40
+
+const level = {
+  length: 0,
+  startX: -400,
+  endX: 0,
+  grounds: [],   // {x, w, g} g=1 floor, -1 ceiling
+  spikes: [],    // {x, w, g, off} off = 0 for ground spike (down from floor), handled by g
+  portals: [],   // {x, type:'gravity'|'speed', g}
+  orbs: [],      // {x, y, type:'yellow'|'pink'}
+  pads: [],      // {x, y}
+  coins: [],     // {x, y, r, taken}
+  finishX: 0,
+  decorations: []
+}
+
+function resetLevel() {
+  level.grounds = []
+  level.spikes = []
+  level.portals = []
+  level.orbs = []
+  level.pads = []
+  level.coins = []
+  level.decorations = []
+  level.length = 2800
+  level.startX = -400
+  level.endX = level.startX + level.length
+  level.finishX = level.endX + 300
+
+  const G = 1  // floor gravity
+  const F = -1 // ceiling gravity
+
+  // helper
+  const addG = (x, w, g = G) => level.grounds.push({ x, w, g })
+  const addS = (x, w, g = G) => level.spikes.push({ x, w, g })
+
+  // Section 1: intro flat
+  addG(-400, 320)
+  addS(60, 40)
+  addS(150, 40)
+  addG(300, 120)
+  addS(360, 40)
+  addS(460, 40)
+
+  // Section 2: triple spike jump
+  addG(620, 200)
+  addS(660, 40); addS(740, 40); addS(820, 40)
+  level.orbs.push({ x: 540, y: H - GROUND_H - 100, type: 'yellow' })
+
+  // Section 3: pit with pads
+  addG(1000, 140)
+  addG(1220, 140)
+  level.pads.push({ x: 1080, y: H - GROUND_H - 100 })
+  addS(1060, 40)
+
+  // Section 4: gravity flip -> ceiling run
+  addG(1450, 180)
+  level.portals.push({ x: 1500, type: 'gravity', g: F })
+  addG(1620, 300, F)  // ceiling
+  addS(1700, 40, F)
+  addS(1820, 40, F)
+  level.orbs.push({ x: 1720, y: GROUND_H + 60, type: 'pink' })
+
+  // flip back
+  level.portals.push({ x: 1980, type: 'gravity', g: G })
+  addG(2060, 220)
+  addS(2100, 40); addS(2180, 40)
+
+  // Section 5: speed portal + tight corridor
+  level.portals.push({ x: 2340, type: 'speed' })
+  addG(2400, 160)
+  addS(2440, 30); addS(2490, 30); addS(2540, 30); addS(2590, 30)
+  addG(2700, 180)
+
+  // coins along the way
+  level.coins.push({ x: 260, y: H - GROUND_H - 130, r: 12, taken: false })
+  level.coins.push({ x: 880, y: H - GROUND_H - 150, r: 12, taken: false })
+  level.coins.push({ x: 1680, y: GROUND_H + 80, r: 12, taken: false })
+  level.coins.push({ x: 2560, y: H - GROUND_H - 130, r: 12, taken: false })
+
+  // practice checkpoints
+  if (practice) {
+    checkpoints = [
+      { x: 700 },
+      { x: 1560 },
+      { x: 2380 }
+    ]
+  }
+
+  level.decorations = []
+  for (let x = -500; x < level.endX + 600; x += 100) {
+    level.decorations.push({ x, y: Math.sin(x * 0.02) * 20 + 60, s: 0.6 + Math.random() * 0.8 })
+  }
+}
+
+// ---------- Player ----------
+const player = {
+  x: 0, y: 0, vx: 0, vy: 0,
+  size: PLAYER_SIZE,
+  g: 1,                    // current gravity orientation (1 down, -1 up)
+  grounded: false,
+  dead: false,
+  win: false,
+  rot: 0,                  // visual rotation
+  targetRot: 0,
+  color: '#00f2ff',
+  trail: [],
+  justFlipped: 0,
+  moveSpeed: 7,
+  baseSpeed: 7,
+
+  reset(x, y, g) {
+    this.x = x; this.y = y; this.vx = 0; this.vy = 0
+    this.g = g; this.grounded = false; this.dead = false; this.win = false
+    this.rot = 0; this.targetRot = 0; this.trail = []
+    this.justFlipped = 0; this.moveSpeed = this.baseSpeed
+    this.color = '#00f2ff'
+  },
+
+  snapToSurface() {
+    this.y = getSurfaceY(this.g)
+    this.vy = 0
+    this.grounded = true
+  }
+}
+
+// ---------- Collision ----------
+function rectRect(r1, r2) {
+  return r1.x < r2.x + r2.w && r1.x + r1.w > r2.x &&
+         r1.y < r2.y + r2.h && r1.y + r1.h > r2.y
+}
+
+function getSurfaceY(g) {
+  const half = PLAYER_SIZE / 2
+  return g === 1 ? H - GROUND_H - half : CEIL_EDGE + half
+}
+
+function updatePlayer(dt) {
+  if (player.dead || player.win) return
+
+  // gravity
+  const gravity = 0.9 * player.g
+  player.vy += gravity * dt * 60
+  if (Math.abs(player.vy) > 22) player.vy = 22 * Math.sign(player.vy)
+
+  // jump (only when grounded)
+  if (input.jumpJust && player.grounded) {
+    player.vy = -13 * player.g
+    player.grounded = false
+    SFX.jump()
+    spawnParticles(player.x, player.y + player.size / 2 * player.g, player.color, 10, 5)
+    shakeScreen(3)
+    player.targetRot = player.rot + (player.g === 1 ? -Math.PI / 2 : Math.PI / 2)
+  }
+
+  // auto forward
+  player.x += player.moveSpeed * dt * 60
+
+  // apply movement
+  player.y += player.vy * dt * 60
+
+  // ground collision (only segments matching current gravity)
+  let onGround = false
+  const half = player.size / 2
+  const standY = getSurfaceY(player.g)
+  const pr = { x: player.x + 6, y: player.y - half + 4, w: player.size - 12, h: player.size - 8 }
+
+  for (const gnd of level.grounds) {
+    if (gnd.g !== player.g) continue
+    const top = gnd.g === 1 ? H - GROUND_H : 0
+    const gr = { x: gnd.x, y: top, w: gnd.w, h: GROUND_H }
+    if (rectRect(pr, gr)) {
+      const reached = player.g === 1 ? player.y >= standY : player.y <= standY
+      if (reached) {
+        player.y = standY
+        player.vy = 0
+        onGround = true
+      }
+    }
+  }
+  player.grounded = onGround
+
+  // ceiling hit (opposite gravity surface) -> bonk
+  if ((player.g === 1 && player.y - player.size / 2 < CEIL_EDGE + 8) ||
+      (player.g === -1 && player.y + player.size / 2 > H - GROUND_H - 8)) {
+    player.vy = -player.vy * 0.4
+  }
+
+  // spike collision
+  for (const sp of level.spikes) {
+    if (sp.g !== player.g) continue
+    const baseY = sp.g === 1 ? H - GROUND_H : CEIL_EDGE
+    const sr = { x: sp.x + 2,
+                 y: sp.g === 1 ? baseY - GROUND_H + 2 : baseY + 2,
+                 w: sp.w - 4, h: GROUND_H - 4 }
+    if (rectRect({ x: pr.x + 4, y: pr.y + 4, w: pr.w - 8, h: pr.h - 8 }, sr)) {
+      die()
+      return
+    }
+  }
+
+  // out of bounds (fall off)
+  if (player.g === 1 && player.y > H + 100) die()
+  if (player.g === -1 && player.y < -100) die()
+
+  // portals
+  for (const p of level.portals) {
+    if (Math.abs(player.x - p.x) < 28) {
+      if (p.type === 'gravity') {
+        player.g = p.g
+        player.snapToSurface()
+        player.rot = 0
+        player.targetRot = 0
+        player.color = p.g === 1 ? '#00f2ff' : '#ff00ff'
+        SFX.portal()
+        spawnParticles(player.x, player.y, player.color, 14, 6)
+        shakeScreen(5)
+        player.justFlipped = 12
+      } else if (p.type === 'speed') {
+        player.moveSpeed = 15
+        player.color = '#ffff00'
+        SFX.portal()
+        spawnParticles(player.x, player.y, '#ffff00', 14, 6)
+        shakeScreen(4)
+      }
+      // portals trigger once
+      p.x = -99999
+    }
+  }
+
+  // orbs
+  for (const o of level.orbs) {
+    if (o.taken) continue
+    if (Math.abs(player.x - o.x) < 30 && Math.abs(player.y - o.y) < 40) {
+      o.taken = true
+      const boost = o.type === 'pink' ? -19 : -16
+      player.vy = boost * player.g
+      player.grounded = false
+      SFX.orb()
+      spawnParticles(o.x, o.y, o.type === 'pink' ? '#ff00ff' : '#ffff00', 16, 7)
+      shakeScreen(4)
+      player.targetRot = player.rot + (player.g === 1 ? -Math.PI / 3 : Math.PI / 3)
+    }
+  }
+
+  // pads
+  for (const pad of level.pads) {
+    if (Math.abs(player.x - pad.x) < 34 && Math.abs(player.y - pad.y) < 45) {
+      player.vy = -17 * player.g
+      player.grounded = false
+      SFX.pad()
+      spawnParticles(pad.x, pad.y, '#00ff88', 14, 6)
+    }
+  }
+
+  // coins
+  for (const c of level.coins) {
+    if (c.taken) continue
+    if (Math.hypot(player.x - c.x, player.y - c.y) < c.size || Math.hypot(player.x - c.x, player.y - c.y) < 28) {
+      c.taken = true
+      coins++
+      SFX.coin()
+      spawnParticles(c.x, c.y, '#ffd700', 10, 5)
+      updateHUD()
+    }
+  }
+
+  // finish
+  if (player.x > level.finishX) {
+    win()
+  }
+
+  // rotation visual
+  const targetRot = player.grounded ? 0 : player.targetRot
+  player.rot += (targetRot - player.rot) * 0.15
+
+  // trail
+  player.trail.push({ x: player.x, y: player.y, g: player.g, life: 1 })
+  if (player.trail.length > 14) player.trail.shift()
+  for (let i = 0; i < player.trail.length; i++) player.trail[i].life -= 0.07
+  while (player.trail.length && player.trail[0].life <= 0) player.trail.shift()
+
+  if (player.justFlipped > 0) player.justFlipped--
+}
+
+// ---------- Game flow ----------
+function die() {
+  if (player.dead || player.win) return
+  player.dead = true
+  deaths++
+  SFX.die()
+  spawnParticles(player.x + player.size / 2, player.y + player.size / 2, '#ff3b3b', 22, 9)
+  shakeScreen(14)
+  updateHUD()
+  setTimeout(() => {
+    if (state === STATE.PLAYING) {
+      state = STATE.DEAD
+      document.getElementById('dead-attempt').textContent = attempt
+      document.getElementById('dead-percent').textContent = Math.floor(progressPct()) + '%'
+      document.getElementById('menu-dead').classList.add('open')
+    }
+  }, 500)
+}
+
+function respawn() {
+  document.getElementById('menu-dead').classList.remove('open')
+  const cx = practice && checkpoints.length ? checkpoints[0].x : level.startX
+  // find nearest checkpoint behind player for practice
+  let respawnX = level.startX
+  if (practice) {
+    let best = level.startX
+    for (const cp of checkpoints) if (cp.x <= player.x + 50) best = cp.x
+    respawnX = best
+  }
+  const g = 1
+  player.reset(respawnX, getSurfaceY(g), g)
+  player.grounded = true
+  camera.x = player.x - W * 0.25
+  state = STATE.PLAYING
+  if (!musicStarted) startMusic()
+}
+
+function win() {
+  player.win = true
+  state = STATE.WON
+  SFX.win()
+  stopMusic()
+  spawnParticles(player.x + player.size / 2, player.y + player.size / 2, '#00f2ff', 30, 8)
+  document.getElementById('won-stat').innerHTML =
+    `Attempt <b>${attempt}</b> &bull; <b>${deaths}</b> death${deaths === 1 ? '' : 's'} &bull; <b>${coins}</b> coin${coins === 1 ? '' : 's'}`
+  document.getElementById('menu-won').classList.add('open')
+}
+
+function startGame(prac) {
+  practice = prac
+  attempt++
+  deaths = 0
+  coins = 0
+  document.getElementById('menu-start').classList.remove('open')
+  document.getElementById('menu-dead').classList.remove('open')
+  document.getElementById('menu-won').classList.remove('open')
+  document.getElementById('menu-pause').classList.remove('open')
+  document.getElementById('mode-chip').style.display = prac ? 'block' : 'none'
+  document.getElementById('mode-chip').querySelector('.v').textContent = prac ? 'PRACTICE' : 'NORMAL'
+  resetLevel()
+  player.reset(level.startX, getSurfaceY(1), 1)
+  player.grounded = true
+  camera.x = player.x - W * 0.25
+  state = STATE.PLAYING
+  updateHUD()
+  ensureAudio()
+  startMusic()
+}
+
+function showStart() {
+  state = STATE.MENU
+  stopMusic()
+  document.getElementById('menu-pause').classList.remove('open')
+  document.getElementById('menu-dead').classList.remove('open')
+  document.getElementById('menu-won').classList.remove('open')
+  document.getElementById('menu-start').classList.add('open')
+}
+
+function togglePause() {
+  if (state === STATE.PLAYING) { state = STATE.PAUSED; document.getElementById('menu-pause').classList.add('open'); stopMusic() }
+  else if (state === STATE.PAUSED) { state = STATE.PLAYING; document.getElementById('menu-pause').classList.remove('open'); startMusic() }
+}
+
+function progressPct() {
+  return Math.min(100, ((player.x - level.startX) / (level.finishX - level.startX)) * 100)
+}
+
+function updateHUD() {
+  document.getElementById('percent').textContent = Math.floor(progressPct()) + '%'
+  document.getElementById('attempts').textContent = attempt
+  document.getElementById('deaths').textContent = deaths
+  document.getElementById('coins').textContent = coins
+  const bar = document.getElementById('progress-bar')
+  bar.style.width = progressPct() + '%'
+}
+
+// ---------- Rendering ----------
+function drawGrid() {
+  const gs = 40
+  const start = Math.floor((camera.x) / gs) * gs
+  const end = camera.x + W + gs
+  const ox = -(camera.x % gs)
+  const oy = H / 2
+  ctx.strokeStyle = 'rgba(255,255,255,0.035)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let x = start; x <= end; x += gs) {
+    ctx.moveTo(x - camera.x, 0); ctx.lineTo(x - camera.x, H)
+  }
+  ctx.stroke()
+  // floor line
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(0, H - GROUND_H); ctx.lineTo(W, H - GROUND_H)
+  ctx.moveTo(0, GROUND_H); ctx.lineTo(W, GROUND_H)
+  ctx.stroke()
+}
+
+function drawGround() {
+  for (const gnd of level.grounds) {
+    const gx = gnd.x - camera.x
+    const gy = gnd.g === 1 ? H - GROUND_H : 0
+    const gh = GROUND_H
+    ctx.fillStyle = gnd.g === 1 ? '#1a1d26' : '#161821'
+    ctx.fillRect(gx, gy, gnd.w, gh)
+    // edge highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.10)'
+    ctx.fillRect(gx, gy, gnd.w, 4)
+    ctx.fillRect(gx, gy + gh - 4, gnd.w, 4)
+    // grid blocks
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'
+    ctx.lineWidth = 1
+    for (let bx = gnd.x; bx < gnd.x + gnd.w; bx += BLOCK) {
+      const rx = bx - camera.x
+      if (rx + BLOCK < 0 || rx > W) continue
+      ctx.strokeRect(rx, gy, BLOCK, gh)
+    }
+  }
+}
+
+function drawSpikes() {
+  for (const sp of level.spikes) {
+    const sx = sp.x - camera.x
+    const baseY = sp.g === 1 ? H - GROUND_H : CEIL_EDGE
+    const n = Math.ceil(sp.w / 24)
+    ctx.fillStyle = sp.g === 1 ? '#ff3b3b' : '#ff5fd1'
+    ctx.beginPath()
+    for (let i = 0; i <= n; i++) {
+      const x = sx + i * 24
+      const tip = sp.g === 1 ? baseY - GROUND_H : baseY + GROUND_H
+      ctx.lineTo(x, i % 2 === 0 ? baseY : tip)
+    }
+    ctx.closePath()
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)'
+    ctx.stroke()
+  }
+}
+
+function drawPortals() {
+  const now = Date.now() / 1000
+  for (const p of level.portals) {
+    if (p.x < camera.x - 100 || p.x > camera.x + W + 100) continue
+    const x = p.x - camera.x
+    const y = p.g === 1 ? H - GROUND_H - 30 : 30
+    const r = 20 + Math.sin(now * 4) * 3
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r + 20)
+    grad.addColorStop(0, p.type === 'speed' ? '#ffff00' : (p.g === 1 ? '#00f2ff' : '#ff00ff'))
+    grad.addColorStop(1, 'transparent')
+    ctx.fillStyle = grad
+    ctx.beginPath(); ctx.arc(x, y, r + 18, 0, Math.PI * 2); ctx.fill()
+    ctx.strokeStyle = p.type === 'speed' ? '#ffff00' : (p.g === 1 ? '#00f2ff' : '#ff00ff')
+    ctx.lineWidth = 2
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke()
+  }
+}
+
+function drawOrbs() {
+  for (const o of level.orbs) {
+    if (o.taken) continue
+    const x = o.x - camera.x, y = o.y
+    if (x < -40 || x > W + 40) continue
+    const c = o.type === 'pink' ? '#ff00ff' : '#ffff00'
+    ctx.shadowColor = c; ctx.shadowBlur = 16
+    ctx.fillStyle = c
+    ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.fill()
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2
+    ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.stroke()
+    ctx.shadowBlur = 0
+  }
+}
+
+function drawPads() {
+  for (const pad of level.pads) {
+    const x = pad.x - camera.x, y = pad.y
+    if (x < -40 || x > W + 40) continue
+    ctx.fillStyle = '#00ff88'
+    ctx.beginPath(); ctx.moveTo(x, y + 14); ctx.lineTo(x - 14, y - 14); ctx.lineTo(x + 14, y - 14); ctx.closePath(); ctx.fill()
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(x, y + 14); ctx.lineTo(x - 14, y - 14); ctx.lineTo(x + 14, y - 14); ctx.closePath(); ctx.stroke()
+  }
+}
+
+function drawCoins() {
+  for (const c of level.coins) {
+    if (c.taken) continue
+    const x = c.x - camera.x, y = c.y
+    if (x < -40 || x > W + 40) continue
+    ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 14
+    ctx.fillStyle = '#ffd700'
+    ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill()
+    ctx.shadowBlur = 0
+  }
+}
+
+function drawFinish() {
+  const x = level.finishX - camera.x
+  if (x < -60 || x > W + 60) return
+  ctx.fillStyle = '#00f2ff'
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(x - 3, i * 22, 6, 18)
+  }
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2
+  ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+}
+
+function drawPlayer() {
+  const p = player
+  // trail
+  for (let i = 0; i < p.trail.length; i++) {
+    const t = p.trail[i]
+    const tx = t.x - camera.x
+    if (tx < -40 || tx > W + 40) continue
+    ctx.globalAlpha = t.life * 0.35
+    ctx.fillStyle = p.color
+    const gy = t.g === 1 ? H - GROUND_H - p.size / 2 : CEIL_EDGE + p.size / 2
+    ctx.fillRect(tx, gy - p.size / 2 + (1 - t.life) * 4, p.size * t.life, p.size * t.life)
+  }
+  ctx.globalAlpha = 1
+
+  const x = p.x - camera.x
+  const gy = p.g === 1 ? H - GROUND_H - p.size / 2 : CEIL_EDGE + p.size / 2
+  const half = p.size / 2
+
+  ctx.save()
+  ctx.translate(x + half, gy)
+  ctx.rotate(p.rot)
+
+  // body
+  const grad = ctx.createLinearGradient(-half, -half, half, half)
+  grad.addColorStop(0, p.color)
+  grad.addColorStop(1, '#0a141f')
+  ctx.fillStyle = grad
+  ctx.fillRect(-half, -half, p.size, p.size)
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'
+  ctx.lineWidth = 2
+  ctx.strokeRect(-half + 2, -half + 2, p.size - 4, p.size - 4)
+
+  // face/eyes
+  ctx.fillStyle = '#fff'
+  const eye = 5
+  ctx.fillRect(-half + 8, -half + 8, eye, eye)
+  ctx.fillRect(half - 8 - eye, -half + 8, eye, eye)
+
+  if (p.dead) {
+    ctx.globalAlpha = 0.45
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(-half + 6, -half + 14, eye, eye)
+    ctx.fillRect(half - 6 - eye, -half + 14, eye, eye)
+    ctx.globalAlpha = 1
+  }
+
+  ctx.restore()
+
+  // death flash handled by shake/particles
+}
+
+function drawBackground() {
+  const grad = ctx.createLinearGradient(0, 0, 0, H)
+  grad.addColorStop(0, '#030406')
+  grad.addColorStop(0.5, '#0a0d14')
+  grad.addColorStop(1, '#06070a')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, W, H)
+
+  // parallax stars
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  for (let i = 0; i < 60; i++) {
+    const sx = ((i * 137) % 2000) - camera.x * 0.15
+    const sy = (i * 73) % H
+    const s = 1 + (i % 3)
+    ctx.fillRect(sx, sy, s, s)
+  }
+
+  // distant grid lines
+  ctx.strokeStyle = 'rgba(0,242,255,0.04)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let y = 0; y <= H; y += 60) {
+    ctx.moveTo(-camera.x * 0.3, y); ctx.lineTo(W - camera.x * 0.3, y)
+  }
+  ctx.stroke()
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H)
+  drawBackground()
+
+  applyShake()
+  camera.targetX = player.x - W * 0.25
+  camera.x += (camera.targetX - camera.x) * 0.12
+  ctx.translate(-camera.x, 0)
+
+  drawGrid()
+  drawGround()
+  drawSpikes()
+  drawPortals()
+  drawOrbs()
+  drawPads()
+  drawCoins()
+  drawFinish()
+  drawPlayer()
+  drawParticles()
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+}
+
+// ---------- Main loop ----------
+let last = performance.now()
+function loop(now) {
+  const dt = Math.min((now - last) / 16.67, 1.5)
+  last = now
+
+  sampleInput()
+
+  if (state === STATE.PLAYING) {
+    updatePlayer(dt)
+    updateParticles(dt)
+    if (!player.dead && !player.win) {
+      updateHUD()
+    }
+    if (input.pauseJust) togglePause()
+  } else if (state === STATE.PAUSED) {
+    if (input.pauseJust) togglePause()
+  }
+
+  render()
+  requestAnimationFrame(loop)
+}
+
+// ---------- Boot ----------
+function init() {
+  resize()
+  updateHUD()
+  requestAnimationFrame(loop)
+  // ensure click starts audio
+  window.addEventListener('pointerdown', ensureAudio, { once: true })
+  window.addEventListener('touchstart', ensureAudio, { once: true })
+}
+
+// expose for HTML buttons
+window.startGame = startGame
+window.showStart = showStart
+window.respawn = respawn
+window.togglePause = togglePause
+window.toggleMute = toggleMute
+
+init()
+</script>
+</body>
+</html>
