@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Geomash — Neon 2D platformer</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="1280" height="720" aria-label="Game canvas"></canvas>
+  <div id="ui">
+    <div id="hud" class="hud">
+      <div class="bar-wrap"><div id="progress" class="bar"></div></div>
+      <div class="stats">
+        <span id="pct">0%</span>
+        <span id="attempts">Attempt: 1</span>
+        <span id="coins">Coins: 0</span>
+        <span id="mode">NORMAL</span>
+      </div>
+      <button id="btnPause" class="btn icon" title="Pause" onclick="game.pause()">&#10073;&#10073;</button>
+    </div>
+
+    <div id="panel-menu" class="panel">
+      <div class="logo">Geomash</div>
+      <div class="tag">Neon 2D platformer — sync to the beat</div>
+      <div class="buttons">
+        <button class="btn primary big" onclick="game.startGame()">Play</button>
+        <button class="btn" onclick="game.openLevels()">Levels</button>
+        <button class="btn" onclick="game.openEditor()">Level Editor</button>
+        <button class="btn" onclick="game.openSettings()">Settings</button>
+      </div>
+      <div class="hint">Tap / Space / Click to jump &bull; Avoid spikes and saws &bull; Collect the 3 coins</div>
+    </div>
+
+    <div id="panel-levels" class="panel hidden">
+      <div class="panel-header">Levels <button class="btn small" onclick="game.showMenu()">Back</button></div>
+      <div id="levels-list" class="levels-list"></div>
+    </div>
+
+    <div id="panel-death" class="panel hidden">
+      <div class="big">Crashed!</div>
+      <div id="death-stat">Attempt: <span id="death-attempt">1</span></div>
+      <div class="buttons">
+        <button class="btn primary" onclick="game.restart()">Restart</button>
+        <button class="btn" id="btnTogglePractice" onclick="game.togglePractice()">Practice: Off</button>
+        <button class="btn" onclick="game.openLevels()">Levels</button>
+        <button class="btn" onclick="game.showMenu()">Menu</button>
+      </div>
+    </div>
+
+    <div id="panel-complete" class="panel hidden">
+      <div class="big ok">Level Complete!</div>
+      <div id="complete-stat">100% &mdash; Coins: <span id="complete-coins">0</span> / 3 &mdash; Attempts: <span id="complete-attempts">1</span></div>
+      <div class="buttons">
+        <button class="btn primary" onclick="game.restart()">Play Again</button>
+        <button class="btn" onclick="game.openLevels()">Levels</button>
+        <button class="btn" onclick="game.showMenu()">Menu</button>
+      </div>
+    </div>
+
+    <div id="panel-pause" class="panel hidden">
+      <div class="big">Paused</div>
+      <div class="buttons">
+        <button class="btn primary" onclick="game.resume()">Resume</button>
+        <button class="btn" onclick="game.restart()">Restart</button>
+        <button class="btn" onclick="game.showMenu()">Menu</button>
+      </div>
+    </div>
+
+    <div id="panel-settings" class="panel hidden">
+      <div class="panel-header">Settings <button class="btn small" onclick="game.showMenu()">Back</button></div>
+      <div class="setting"><label>Music <input type="range" id="svol" min="0" max="1" step="0.1"></label></div>
+      <div class="setting"><label>SFX <input type="range" id="sfxvol" min="0" max="1" step="0.1"></label></div>
+      <div class="setting"><label>Practice mode <input type="checkbox" id="spractice"></label></div>
+    </div>
+
+    <div id="panel-editor" class="panel hidden">
+      <div class="panel-header">Editor <span id="ed-name">(unsaved)</span> <button class="btn small" onclick="game.exitEditor()">Exit</button></div>
+      <div id="ed-toolbar" class="toolbar"></div>
+      <div class="ed-hint">1&ndash;9 pick tool &bull; click to place &bull; drag to move &bull; DEL to remove &bull; SPACE+drag to pan &bull; S save &bull; L load &bull; T test</div>
+    </div>
+  </div>
+</div>
+<script src="js/audio.js"></script>
+<script src="js/game.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', () => { window.game = new Game(); });
+</script>
+</body>
+</html>

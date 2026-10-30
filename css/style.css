@@ -1,0 +1,114 @@
+:root{
+  --bg:#0a0b12;
+  --panel:#141620;
+  --panel2:#1c1f2c;
+  --accent:#8b5cf6;
+  --accent2:#06b6d4;
+  --ok:#22c55e;
+  --bad:#ef4444;
+  --text:#eef2ff;
+  --muted:#94a3b8;
+  --border:#2e3347;
+}
+* { box-sizing: border-box; }
+html, body {
+  height: 100%; margin: 0; background: var(--bg); color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  overflow: hidden; touch-action: none;
+}
+#stage {
+  position: relative; width: 100vw; height: 100vh;
+  display: flex; align-items: center; justify-content: center; background: #07080c;
+}
+canvas {
+  display: block; max-width: 100vw; max-height: 100vh;
+  object-fit: contain; image-rendering: pixelated; background: #050609;
+}
+#ui {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none; z-index: 20;
+}
+#ui > * { pointer-events: auto; }
+
+.hud {
+  position: absolute; top: 0; left: 0; right: 0; pointer-events: none;
+  padding: 12px; display: none; flex-direction: column; align-items: center; z-index: 25;
+}
+.bar-wrap {
+  width: 320px; height: 10px; background: rgba(255,255,255,0.08);
+  border-radius: 6px; overflow: hidden; border: 1px solid var(--border);
+}
+.bar {
+  width: 0%; height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 6px; box-shadow: 0 0 16px var(--accent);
+}
+.stats {
+  margin-top: 8px; display: flex; gap: 18px; font-size: 14px;
+  color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.stats span { color: var(--text); font-weight: 600; }
+#mode { color: var(--accent2); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+.btn#btnPause {
+  position: absolute; top: 14px; right: 14px; padding: 6px 14px; font-size: 16px;
+}
+
+.panel {
+  pointer-events: auto; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 14px; padding: 32px 40px; text-align: center; color: var(--text);
+  width: 340px; max-width: 92vw; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  backdrop-filter: blur(6px);
+}
+.panel.hidden { display: none !important; }
+.logo {
+  font-size: 40px; font-weight: 900; letter-spacing: 2px; color: var(--accent);
+  text-shadow: 0 0 20px var(--accent); margin-bottom: 4px;
+}
+.tag { color: var(--muted); font-size: 13px; margin-bottom: 26px; }
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px; font-size: 18px; font-weight: 700;
+}
+.buttons { display: flex; flex-direction: column; gap: 10px; }
+.buttons.levels { gap: 8px; }
+.btn {
+  border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+  padding: 10px 18px; border-radius: 8px; font-size: 15px; cursor: pointer;
+  transition: transform .05s, border-color .2s, box-shadow .2s;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:active { transform: scale(0.97); }
+.btn.primary {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  box-shadow: 0 0 22px rgba(139,92,246,0.45);
+}
+.btn.primary:hover { box-shadow: 0 0 34px rgba(139,92,246,0.7); }
+.btn.small { padding: 6px 12px; font-size: 13px; background: transparent; }
+.btn.big { padding: 14px 28px; font-size: 17px; }
+.btn.icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  justify-content: center; display: inline-flex; align-items: center;
+}
+.hint { margin-top: 22px; color: var(--muted); font-size: 12.5px; }
+.big { font-size: 34px; font-weight: 800; margin-bottom: 6px; letter-spacing: 1px; }
+.big.ok { color: var(--ok); text-shadow: 0 0 20px var(--ok); }
+.levels-list {
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 320px; overflow-y: auto;
+}
+.level-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--panel2);
+}
+.level-row .info { flex: 1; text-align: left; }
+.level-row .name { font-weight: 700; }
+.level-row .coins { font-size: 12px; color: var(--muted); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 14px 0; }
+.ed-hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+.setting {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 12px 0; font-size: 14px;
+}
+.setting input { width: 110px; accent-color: var(--accent); }
+#ed-toolbar .btn.active-tool { background: var(--accent2); border-color: var(--accent2); color: #000; }
